@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { Toaster } from 'react-hot-toast';
 import AppShell from './components/AppShell';
 import TradeInterface from './components/TradeInterface';
 import Analytics from './components/Analytics';
@@ -17,6 +18,17 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bg text-textPrimary">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'hsl(215, 25%, 20%)',
+            color: 'hsl(0, 0%, 95%)',
+            border: '1px solid hsl(215, 25%, 30%)',
+          },
+        }}
+      />
       <div className="flex h-screen">
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
