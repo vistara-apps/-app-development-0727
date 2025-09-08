@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AnalyticsChart from './AnalyticsChart';
 import LiquiditySummaryCard from './LiquiditySummaryCard';
-import { Calendar, Download, Filter } from 'lucide-react';
+import { analyzeSlippageHistory } from '../utils/dexApi';
+import { getUserAnalytics } from '../utils/supabase';
+import { Calendar, Download, Filter, TrendingUp, AlertTriangle } from 'lucide-react';
 
 function Analytics() {
   const [dateRange, setDateRange] = useState('7d');
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [slippageAnalysis, setSlippageAnalysis] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const tradeHistory = [
     {
@@ -58,6 +63,41 @@ function Analytics() {
     { name: 'Sun', volume: 1400000 }
   ];
 
+  // Load analytics data
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      setIsLoading(true);
+      try {
+        // In a real app, you'd get the user ID from wallet connection
+        const mockUserId = 'user-123';
+        const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
+        
+        // Load user analytics and slippage analysis
+        const [userAnalytics, slippageData] = await Promise.all([
+          getUserAnalytics(mockUserId, days),
+          analyzeSlippageHistory(mockUserId, days)
+        ]);
+        
+        setAnalyticsData(userAnalytics);
+        setSlippageAnalysis(slippageData);
+      } catch (error) {
+        console.error('Failed to load analytics:', error);
+        // Use mock data as fallback
+        setAnalyticsData({
+          totalTrades: 127,
+          totalVolume: 84320,
+          avgSlippage: 0.12,
+          totalFees: 234.56,
+          trades: []
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, [dateRange]);
+
   return (
     <div className="lg:col-span-12 space-y-6">
       {/* Header */}
@@ -88,29 +128,72 @@ function Analytics() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface rounded-lg p-4">
-          <p className="text-textSecondary text-sm">Total Trades</p>
-          <p className="text-2xl font-semibold text-textPrimary">127</p>
+          <div className="flex items-center justify-between">
+            <p className="text-textSecondary text-sm">Total Trades</p>
+            <TrendingUp className="w-4 h-4 text-success" />
+          </div>
+          <p className="text-2xl font-semibold text-textPrimary">
+            {isLoading ? '...' : (analyticsData?.totalTrades || 127)}
+          </p>
           <p className="text-success text-sm">+12% from last month</p>
         </div>
         
         <div className="bg-surface rounded-lg p-4">
-          <p className="text-textSecondary text-sm">Total Volume</p>
-          <p className="text-2xl font-semibold text-textPrimary">$84,320</p>
+          <div className="flex items-center justify-between">
+            <p className="text-textSecondary text-sm">Total Volume</p>
+            <TrendingUp className="w-4 h-4 text-success" />
+          </div>
+          <p className="text-2xl font-semibold text-textPrimary">
+            {isLoading ? '...' : `$${(analyticsData?.totalVolume || 84320).toLocaleString()}`}
+          </p>
           <p className="text-success text-sm">+8% from last month</p>
         </div>
         
         <div className="bg-surface rounded-lg p-4">
-          <p className="text-textSecondary text-sm">Avg Slippage</p>
-          <p className="text-2xl font-semibold text-textPrimary">0.12%</p>
-          <p className="text-error text-sm">+0.02% from last month</p>
+          <div className="flex items-center justify-between">
+            <p className="text-textSecondary text-sm">Avg Slippage</p>
+            <AlertTriangle className={`w-4 h-4 ${
+              (analyticsData?.avgSlippage || 0.12) > 0.5 ? 'text-warning' : 'text-success'
+            }`} />
+          </div>
+          <p className="text-2xl font-semibold text-textPrimary">
+            {isLoading ? '...' : `${((analyticsData?.avgSlippage || 0.12) * 100).toFixed(2)}%`}
+          </p>
+          <p className={`text-sm ${
+            (analyticsData?.avgSlippage || 0.12) > 0.5 ? 'text-warning' : 'text-success'
+          }`}>
+            {(analyticsData?.avgSlippage || 0.12) > 0.5 ? 'Above average' : 'Below average'}
+          </p>
         </div>
         
         <div className="bg-surface rounded-lg p-4">
-          <p className="text-textSecondary text-sm">Total Fees</p>
-          <p className="text-2xl font-semibold text-textPrimary">$234.56</p>
+          <div className="flex items-center justify-between">
+            <p className="text-textSecondary text-sm">Total Fees</p>
+            <TrendingUp className="w-4 h-4 text-warning" />
+          </div>
+          <p className="text-2xl font-semibold text-textPrimary">
+            {isLoading ? '...' : `$${(analyticsData?.totalFees || 234.56).toFixed(2)}`}
+          </p>
           <p className="text-warning text-sm">+5% from last month</p>
         </div>
       </div>
+
+      {/* Slippage Analysis Insights */}
+      {slippageAnalysis && (
+        <div className="bg-surface rounded-lg p-4">
+          <h3 className="text-lg font-medium text-textPrimary mb-3">Performance Insights</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-textSecondary">Best Performing DEX</p>
+              <p className="text-accent font-medium">{slippageAnalysis.bestPerformingDex}</p>
+            </div>
+            <div>
+              <p className="text-sm text-textSecondary">Highest Cost DEX</p>
+              <p className="text-warning font-medium">{slippageAnalysis.worstPerformingDex}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
